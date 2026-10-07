@@ -5,10 +5,10 @@ import (
 )
 
 type ToDo struct {
-	Id          int       `json:"ID"`
-	Description string    `json:"Description"`
-	Created     time.Time `json:"CreatedAt"`
-	Done        bool      `json:"Done"`
+	Id          int
+	Description string
+	Created     time.Time
+	Done        bool
 }
 
 func CreateToDo(description string) ToDo {
