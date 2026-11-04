@@ -2,20 +2,24 @@ package data
 
 import (
 	"time"
+
+	"github.com/pocketbase/pocketbase/core"
 )
 
-type ToDo struct {
-	Id          int
+const TodosCollection = "todos"
+
+type Todo struct {
+	Id          string
 	Description string
 	Created     time.Time
 	Done        bool
 }
 
-func CreateToDo(description string) ToDo {
-	return ToDo{
-		Id:          0,
-		Description: description,
-		Created:     time.Now(),
-		Done:        false,
+func fromRecord(record *core.Record) Todo {
+	return Todo{
+		Id:          record.Id,
+		Description: record.GetString("description"),
+		Created:     record.GetDateTime("created").Time(),
+		Done:        record.GetBool("done"),
 	}
 }

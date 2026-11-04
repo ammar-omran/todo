@@ -4,116 +4,99 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"time"
+
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
 )
 
-const createToDo = `-- name: CreateToDo :one
-INSERT INTO ToDos (description, created, done)
-VALUES ($1, $2, $3)
-RETURNING id, description, created, done`
+var ErrNotFound = errors.New("todo not found")
 
-type CreateToDoParams struct {
-	Description string
-	Created     time.Time
-	Done        bool
+type TodoRepository struct {
+	app core.App
 }
 
-func (q *Queries) CreateToDo(ctx context.Context, arg CreateToDoParams) (ToDo, error) {
-	row := q.db.QueryRowContext(ctx, createToDo,
-		arg.Description,
-		arg.Created,
-		arg.Done)
-	var i ToDo
-	err := row.Scan(
-		&i.Id,
-		&i.Description,
-		&i.Created,
-		&i.Done,
-	)
-	return i, err
+func New(app core.App) *TodoRepository {
+	return &TodoRepository{app: app}
 }
 
-const changeToDoStatus = `-- name: changeToDoStatus :one
-	UPDATE Todos
-	SET done = $2
-	WHERE id = $1
-	RETURNING id;
-`
-
-func (q *Queries) ChangeToDoStatus(ctx context.Context, id int, status bool) error {
-	var updatedID int
-
-	err := q.db.QueryRowContext(
-		ctx,
-		changeToDoStatus,
-		id,
-		status,
-	).Scan(&updatedID)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("todo with id %d not found", id)
+func (r *TodoRepository) Create(ctx context.Context, description string) (Todo, error) {
+	collection, err := r.app.FindCollectionByNameOrId(TodosCollection)
+	if err != nil {
+		return Todo{}, err
 	}
 
-	return err
+	record := core.NewRecord(collection)
+	record.Set("description", description)
+	record.Set("done", false)
+
+	if err := r.app.SaveWithContext(ctx, record); err != nil {
+		return Todo{}, err
+	}
+
+	return fromRecord(record), nil
 }
 
-const getToDosByState = `-- name: getToDosByState :many
-SELECT Id, Description, Created, Done
-	FROM ToDos
-  WHERE Done = $1
-`
-
-func (q *Queries) GetToDosByState(ctx context.Context, done bool) ([]ToDo, error) {
-	rows, err := q.db.QueryContext(ctx, getToDosByState, done)
+func (r *TodoRepository) GetByDone(ctx context.Context, done bool) ([]Todo, error) {
+	records, err := r.app.FindRecordsByFilter(
+		TodosCollection,
+		"done = {:done}",
+		"created",
+		0,
+		0,
+		dbx.Params{"done": done},
+	)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	var todos []ToDo
-
-	for rows.Next() {
-		var todo ToDo
-
-		err := rows.Scan(
-			&todo.Id,
-			&todo.Description,
-			&todo.Created,
-			&todo.Done,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		todos = append(todos, todo)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, err
+	todos := make([]Todo, len(records))
+	for i, record := range records {
+		todos[i] = fromRecord(record)
 	}
 
 	return todos, nil
 }
 
-const deleteTodo = `-- name: DeleteTodo :one
-	DELETE FROM Todos
-	WHERE id = $1
-	RETURNING id;
-`
-
-func (q *Queries) DeleteTodo(ctx context.Context, id int) error {
-	var updatedID int
-
-	err := q.db.QueryRowContext(
-		ctx,
-		deleteTodo,
-		id,
-	).Scan(&updatedID)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("todo with id %d not found", id)
+func (r *TodoRepository) GetByID(ctx context.Context, id string) (Todo, error) {
+	record, err := r.find(id)
+	if err != nil {
+		return Todo{}, err
 	}
 
-	return err
+	return fromRecord(record), nil
+}
+
+func (r *TodoRepository) SetDone(ctx context.Context, id string, done bool) (Todo, error) {
+	record, err := r.find(id)
+	if err != nil {
+		return Todo{}, err
+	}
+
+	record.Set("done", done)
+	if err := r.app.SaveWithContext(ctx, record); err != nil {
+		return Todo{}, err
+	}
+
+	return fromRecord(record), nil
+}
+
+func (r *TodoRepository) Delete(ctx context.Context, id string) error {
+	record, err := r.find(id)
+	if err != nil {
+		return err
+	}
+
+	return r.app.DeleteWithContext(ctx, record)
+}
+
+func (r *TodoRepository) find(id string) (*core.Record, error) {
+	record, err := r.app.FindRecordById(TodosCollection, id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return record, nil
 }

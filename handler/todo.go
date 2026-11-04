@@ -2,18 +2,19 @@ package handler
 
 import (
 	"context"
-	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"strconv"
 	"time"
 	"to-do/data"
+
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type TodoHandler struct {
 	logger *slog.Logger
-	repo   *data.Queries
+	repo   *data.TodoRepository
 }
 
 type ToDoError struct {
@@ -35,47 +36,40 @@ func (e *ToDoError) Error() string {
 }
 
 func New(
-	logger *slog.Logger, db *sql.DB,
+	logger *slog.Logger, app core.App,
 ) *TodoHandler {
 	return &TodoHandler{
 		logger: logger,
-		repo:   data.New(db),
+		repo:   data.New(app),
 	}
 }
 
-func (h *TodoHandler) Create(desc string) (int, error) {
+func (h *TodoHandler) Create(desc string) (string, error) {
 	if desc == "" {
-		return -1, &ToDoError{Code: http.StatusBadRequest, Msg: "Description can't be empty!"}
-	}
-	d := data.CreateToDo(desc)
-	res, err := h.repo.CreateToDo(
-		context.Background(), data.CreateToDoParams{
-			Description: d.Description,
-			Created:     d.Created,
-			Done:        d.Done,
-		},
-	)
-	if err != nil {
-		return -1, err
+		return "", &ToDoError{Code: http.StatusBadRequest, Msg: "Description can't be empty!"}
 	}
 
-	return res.Id, nil
+	todo, err := h.repo.Create(context.Background(), desc)
+	if err != nil {
+		return "", mapError(err)
+	}
+
+	return todo.Id, nil
 }
 
 func (h *TodoHandler) Update(status string, id string) error {
+	if id == "" {
+		return &ToDoError{Code: http.StatusBadRequest, Msg: "Invalid Id"}
+	}
+
 	completed := status != "reopen"
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		return &ToDoError{Code: http.StatusUnprocessableEntity, Msg: "Invalid Id value, only numpers Allowed"}
-	}
-	if err := h.repo.ChangeToDoStatus(context.Background(), idInt, completed); err != nil {
-		return err
-	}
-	return nil
+	_, err := h.repo.SetDone(context.Background(), id, completed)
+
+	return mapError(err)
 }
 
 type ToDoResponse struct {
-	Id          int       `json:"ID"`
+	Id          string    `json:"ID"`
 	Description string    `json:"Description"`
 	Created     time.Time `json:"CreatedAt"`
 	Done        bool      `json:"Done"`
@@ -83,28 +77,43 @@ type ToDoResponse struct {
 
 func (h *TodoHandler) Get(status string) ([]ToDoResponse, error) {
 	completed := status == "completed"
-	res, err := h.repo.GetToDosByState(context.Background(), completed)
+	res, err := h.repo.GetByDone(context.Background(), completed)
 	if err != nil {
-		return nil, err
+		return nil, mapError(err)
 	}
-	return Map(res, func(td data.ToDo) ToDoResponse {
+
+	return Map(res, func(td data.Todo) ToDoResponse {
 		return ToDoResponse{td.Id, td.Description, td.Created, td.Done}
 	}), nil
+}
+
+func (h *TodoHandler) GetByID(id string) (ToDoResponse, error) {
+	td, err := h.repo.GetByID(context.Background(), id)
+	if err != nil {
+		return ToDoResponse{}, mapError(err)
+	}
+
+	return ToDoResponse{td.Id, td.Description, td.Created, td.Done}, nil
 }
 
 func (h *TodoHandler) Delete(id string) error {
 	if id == "" {
 		return &ToDoError{Code: http.StatusBadRequest, Msg: "Invalid Id"}
 	}
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		return &ToDoError{Code: http.StatusUnprocessableEntity, Msg: "Invalid Id value, only numpers Allowed"}
+
+	return mapError(h.repo.Delete(context.Background(), id))
+}
+
+func mapError(err error) error {
+	if err == nil {
+		return nil
 	}
-	err = h.repo.DeleteTodo(context.Background(), int(idInt))
-	if err != nil {
-		return err
+
+	if errors.Is(err, data.ErrNotFound) {
+		return &ToDoError{Code: http.StatusNotFound, Msg: "Todo not found"}
 	}
-	return nil
+
+	return err
 }
 
 func Map[T any, R any](items []T, fn func(T) R) []R {

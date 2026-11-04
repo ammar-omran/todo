@@ -3,13 +3,17 @@ package app
 import (
 	"html/template"
 	"net/http"
+	"os"
 	"to-do/api"
 	"to-do/handler"
 	"to-do/views"
+
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 func (a *App) loadRoutes(tmpl *template.Template) {
-	todoHandler := handler.New(a.logger, a.dbConn)
+	todoHandler := handler.New(a.logger, a.pb)
 	todoApi := &api.Api{Th: todoHandler}
 	homeView := &views.Home{Th: todoHandler, Tmpl: tmpl}
 
@@ -19,19 +23,23 @@ func (a *App) loadRoutes(tmpl *template.Template) {
 	apiRouter.HandleFunc("PUT /{id}", todoApi.Update)
 	apiRouter.HandleFunc("DELETE /{id}", todoApi.Delete)
 
-	webRouter := http.NewServeMux()
-	files := http.FileServer(http.Dir("./static"))
+	a.pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.InstallerFunc = nil
 
-	webRouter.Handle(
-		"GET /static/",
-		http.StripPrefix("/static/", files),
-	)
-	webRouter.HandleFunc("GET /", homeView.Home)
-	webRouter.HandleFunc("GET /todos", homeView.List)
-	webRouter.HandleFunc("POST /todos", homeView.Create)
-	webRouter.HandleFunc("PUT /todos/{id}", homeView.Update)
-	webRouter.HandleFunc("DELETE /todos/{id}", homeView.Delete)
+		se.Router.GET("/static/{path...}", apis.Static(os.DirFS("./static"), false))
 
-	a.router.Handle("/api/todos/", http.StripPrefix("/api/todos", apiRouter))
-	a.router.Handle("/", webRouter)
+		se.Router.GET("/", apis.WrapStdHandler(http.HandlerFunc(homeView.Home)))
+		se.Router.GET("/todos", apis.WrapStdHandler(http.HandlerFunc(homeView.List)))
+		se.Router.POST("/todos", apis.WrapStdHandler(http.HandlerFunc(homeView.Create)))
+		se.Router.PUT("/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(homeView.Update)))
+		se.Router.DELETE("/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(homeView.Delete)))
+
+		apiHandler := apis.WrapStdHandler(http.StripPrefix("/api/todos", apiRouter))
+		se.Router.GET("/api/todos/{path...}", apiHandler)
+		se.Router.POST("/api/todos/{path...}", apiHandler)
+		se.Router.PUT("/api/todos/{path...}", apiHandler)
+		se.Router.DELETE("/api/todos/{path...}", apiHandler)
+
+		return se.Next()
+	})
 }

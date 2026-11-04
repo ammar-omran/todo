@@ -2,74 +2,71 @@ package app
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"html/template"
 	"io/fs"
 	"log/slog"
-	"net/http"
-	"time"
-	"to-do/database"
+
+	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 type App struct {
-	logger     *slog.Logger
-	router     *http.ServeMux
-	dbConn     *sql.DB
-	migrations fs.FS
-	templates  fs.FS
+	logger    *slog.Logger
+	pb        *pocketbase.PocketBase
+	templates fs.FS
 }
 
-func New(logger *slog.Logger, migrations fs.FS, templates fs.FS) *App {
-	router := http.NewServeMux()
+func New(logger *slog.Logger, templates fs.FS) *App {
+	pb := pocketbase.NewWithConfig(pocketbase.Config{
+		HideStartBanner: true,
+		DefaultDataDir:  "./pb_data",
+	})
 
-	app := &App{
-		logger:     logger,
-		router:     router,
-		migrations: migrations,
-		templates:  templates,
+	return &App{
+		logger:    logger,
+		pb:        pb,
+		templates: templates,
 	}
-
-	return app
 }
 
 func (a *App) Start(ctx context.Context) error {
-	conn, err := database.Connect(ctx, a.logger, a.migrations)
-	if err != nil {
-		return fmt.Errorf("failed to connect to db: %w", err)
-	}
-	a.dbConn = conn
-
 	tmpl := template.Must(template.New("").ParseFS(a.templates, "templates/*"))
 
 	a.loadRoutes(tmpl)
 
-	server := http.Server{
-		Addr:    ":8080",
-		Handler: a.router,
+	if err := a.pb.Bootstrap(); err != nil {
+		return fmt.Errorf("bootstrap pocketbase: %w", err)
 	}
+	defer a.pb.ClearBootstrap()
 
-	// graceful shutdown
 	done := make(chan struct{})
-	go func() {
-		err := server.ListenAndServe()
-		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			a.logger.Error("failed to listen and serve", slog.Any("error", err))
-		}
-		close(done)
+	defer close(done)
 
+	go func() {
+		select {
+		case <-ctx.Done():
+			a.logger.Info("shutting down")
+			event := &core.TerminateEvent{App: a.pb}
+			err := a.pb.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
+				return e.Next()
+			})
+			if err != nil {
+				a.logger.Error("failed to terminate app", slog.Any("error", err))
+			}
+		case <-done:
+		}
 	}()
 
 	a.logger.Info("server listening", slog.String("addr", ":8080"))
-	select {
-	case <-done:
-		break
-	case <-ctx.Done():
-		a.logger.Info("Shutting Down!")
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-		server.Shutdown(ctx)
-		cancel()
+
+	err := apis.Serve(a.pb, apis.ServeConfig{
+		HttpAddr:        ":8080",
+		ShowStartBanner: false,
+	})
+	if err != nil {
+		return fmt.Errorf("serve: %w", err)
 	}
 
 	return nil

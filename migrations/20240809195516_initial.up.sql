@@ -1,7 +1,0 @@
-CREATE TABLE ToDos (
-    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-    Description TEXT NOT NULL,
-    Created TIMESTAMP,
-    Done BIT
-);
-

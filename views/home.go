@@ -4,7 +4,6 @@ import (
 	"errors"
 	"html/template"
 	"net/http"
-	"strconv"
 	"strings"
 	"to-do/handler"
 )
@@ -59,7 +58,7 @@ func (a *Home) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	todo, err := a.findTodo(id, "")
+	todo, err := a.Th.GetByID(id)
 	if err != nil {
 		a.renderError(w, req, err)
 		return
@@ -77,18 +76,7 @@ func (a *Home) Update(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	idInt, err := strconv.Atoi(id)
-	if err != nil {
-		a.renderError(w, req, &handler.ToDoError{Code: http.StatusUnprocessableEntity, Msg: "Invalid Id value, only numpers Allowed"})
-		return
-	}
-
-	lookupStatus := ""
-	if status != "reopen" {
-		lookupStatus = "completed"
-	}
-
-	todo, err := a.findTodo(idInt, lookupStatus)
+	todo, err := a.Th.GetByID(id)
 	if err != nil {
 		a.renderError(w, req, err)
 		return
@@ -106,21 +94,6 @@ func (a *Home) Delete(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-}
-
-func (a *Home) findTodo(id int, status string) (handler.ToDoResponse, error) {
-	todos, err := a.Th.Get(status)
-	if err != nil {
-		return handler.ToDoResponse{}, err
-	}
-
-	for _, todo := range todos {
-		if todo.Id == id {
-			return todo, nil
-		}
-	}
-
-	return handler.ToDoResponse{}, &handler.ToDoError{Code: http.StatusNotFound, Msg: "Todo not found"}
 }
 
 func (a *Home) render(w http.ResponseWriter, code int, name string, data any) {

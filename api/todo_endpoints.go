@@ -46,7 +46,7 @@ func (a *Api) Create(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	type idStruct struct{ Id int }
+	type idStruct struct{ Id string }
 	respondWithJSON(w, http.StatusCreated, dataResponse{true, "Todo Created successfully", idStruct{res}})
 }
 
