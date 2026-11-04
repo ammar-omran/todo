@@ -1,0 +1,28 @@
+{{define "todo-row"}}
+<tr id="todo-{{.Id}}">
+  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-300">{{.Id}}</td>
+  <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm font-medium text-gray-300">
+    {{if .Done}}<span class="text-gray-400">{{.Description}}</span>{{else}}{{.Description}}{{end}}
+  </td>
+  <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-400">{{.Created.Format "02 Jan 06 15:04 MST"}}</td>
+  <td class="whitespace-nowrap px-3 py-4 text-sm">
+    <button hx-put="/todos/{{.Id}}?status={{if .Done}}reopen{{else}}completed{{end}}"
+            hx-target="#todo-{{.Id}}"
+            hx-swap="outerHTML"
+            hx-status:4xx="target:#form-error"
+            hx-status:5xx="target:#form-error"
+            class="rounded bg-teal-500 px-3 py-1 text-sm font-medium text-white hover:bg-teal-700">
+      {{if .Done}}Reopen{{else}}Complete{{end}}
+    </button>
+    <button hx-delete="/todos/{{.Id}}"
+            hx-target="#todo-{{.Id}}"
+            hx-swap="delete"
+            hx-confirm="Delete this todo?"
+            hx-status:4xx="target:#form-error"
+            hx-status:5xx="target:#form-error"
+            class="rounded border-4 border-teal-500 px-3 py-1 text-sm font-medium text-white hover:border-teal-700">
+      Delete
+    </button>
+  </td>
+</tr>
+{{end}}
