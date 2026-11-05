@@ -20,7 +20,7 @@ type App struct {
 
 func New(logger *slog.Logger, templates fs.FS) *App {
 	pb := pocketbase.NewWithConfig(pocketbase.Config{
-		HideStartBanner: true,
+		HideStartBanner: false,
 		DefaultDataDir:  "./pb_data",
 	})
 
@@ -59,11 +59,11 @@ func (a *App) Start(ctx context.Context) error {
 		}
 	}()
 
-	a.logger.Info("server listening", slog.String("addr", ":8080"))
+	a.logger.Info("server listening", slog.String("addr", "localhost:8080"))
 
 	err := apis.Serve(a.pb, apis.ServeConfig{
-		HttpAddr:        ":8080",
-		ShowStartBanner: false,
+		HttpAddr:        "localhost:8080",
+		ShowStartBanner: true,
 	})
 	if err != nil {
 		return fmt.Errorf("serve: %w", err)

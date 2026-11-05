@@ -24,8 +24,6 @@ func (a *App) loadRoutes(tmpl *template.Template) {
 	apiRouter.HandleFunc("DELETE /{id}", todoApi.Delete)
 
 	a.pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
-		se.InstallerFunc = nil
-
 		se.Router.GET("/static/{path...}", apis.Static(os.DirFS("./static"), false))
 
 		se.Router.GET("/", apis.WrapStdHandler(http.HandlerFunc(homeView.Home)))
