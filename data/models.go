@@ -3,7 +3,7 @@ package data
 import (
 	"time"
 
-	"github.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
 
 const TodosCollection = "todos"

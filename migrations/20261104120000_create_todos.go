@@ -1,9 +1,9 @@
 package migrations
 
 import (
-	"github.com/pocketbase/pocketbase/core"
-	pbmigrations "github.com/pocketbase/pocketbase/migrations"
-	"github.com/pocketbase/pocketbase/tools/types"
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	pbmigrations "ganigeorgiev.com/pocketbase/pocketbase/migrations"
+	"ganigeorgiev.com/pocketbase/pocketbase/tools/types"
 )
 
 func init() {

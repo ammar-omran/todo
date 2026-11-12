@@ -9,7 +9,7 @@ import (
 	"time"
 	"to-do/data"
 
-	"github.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
 
 type TodoHandler struct {

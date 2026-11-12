@@ -8,20 +8,14 @@ import (
 	"to-do/handler"
 	"to-do/views"
 
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/apis"
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
 )
 
 func (a *App) loadRoutes(tmpl *template.Template) {
 	todoHandler := handler.New(a.logger, a.pb)
 	todoApi := &api.Api{Th: todoHandler}
 	homeView := &views.Home{Th: todoHandler, Tmpl: tmpl}
-
-	apiRouter := http.NewServeMux()
-	apiRouter.HandleFunc("GET /", todoApi.Get)
-	apiRouter.HandleFunc("POST /", todoApi.Create)
-	apiRouter.HandleFunc("PUT /{id}", todoApi.Update)
-	apiRouter.HandleFunc("DELETE /{id}", todoApi.Delete)
 
 	a.pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		se.Router.GET("/static/{path...}", apis.Static(os.DirFS("./static"), false))
@@ -32,11 +26,10 @@ func (a *App) loadRoutes(tmpl *template.Template) {
 		se.Router.PUT("/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(homeView.Update)))
 		se.Router.DELETE("/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(homeView.Delete)))
 
-		apiHandler := apis.WrapStdHandler(http.StripPrefix("/api/todos", apiRouter))
-		se.Router.GET("/api/todos/{path...}", apiHandler)
-		se.Router.POST("/api/todos/{path...}", apiHandler)
-		se.Router.PUT("/api/todos/{path...}", apiHandler)
-		se.Router.DELETE("/api/todos/{path...}", apiHandler)
+		se.Router.GET("/api/todos/", apis.WrapStdHandler(http.HandlerFunc(todoApi.Get)))
+		se.Router.POST("/api/todos/", apis.WrapStdHandler(http.HandlerFunc(todoApi.Create)))
+		se.Router.PUT("/api/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(todoApi.Update)))
+		se.Router.DELETE("/api/todos/{id}", apis.WrapStdHandler(http.HandlerFunc(todoApi.Delete)))
 
 		return se.Next()
 	})

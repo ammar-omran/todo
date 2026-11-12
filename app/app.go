@@ -7,14 +7,13 @@ import (
 	"io/fs"
 	"log/slog"
 
-	"github.com/pocketbase/pocketbase"
-	"github.com/pocketbase/pocketbase/apis"
-	"github.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase"
+	"ganigeorgiev.com/pocketbase/pocketbase/apis"
 )
 
 type App struct {
 	logger    *slog.Logger
-	pb        *pocketbase.PocketBase
+	Pb        *pocketbase.PocketBase
 	templates fs.FS
 }
 
@@ -26,7 +25,7 @@ func New(logger *slog.Logger, templates fs.FS) *App {
 
 	return &App{
 		logger:    logger,
-		pb:        pb,
+		Pb:        pb,
 		templates: templates,
 	}
 }
@@ -36,32 +35,14 @@ func (a *App) Start(ctx context.Context) error {
 
 	a.loadRoutes(tmpl)
 
-	if err := a.pb.Bootstrap(); err != nil {
+	if err := a.Pb.Bootstrap(); err != nil {
 		return fmt.Errorf("bootstrap pocketbase: %w", err)
 	}
-	defer a.pb.ClearBootstrap()
-
-	done := make(chan struct{})
-	defer close(done)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-			a.logger.Info("shutting down")
-			event := &core.TerminateEvent{App: a.pb}
-			err := a.pb.OnTerminate().Trigger(event, func(e *core.TerminateEvent) error {
-				return e.Next()
-			})
-			if err != nil {
-				a.logger.Error("failed to terminate app", slog.Any("error", err))
-			}
-		case <-done:
-		}
-	}()
+	defer a.Pb.ClearBootstrap()
 
 	a.logger.Info("server listening", slog.String("addr", "localhost:8080"))
 
-	err := apis.Serve(a.pb, apis.ServeConfig{
+	err := apis.Serve(a.Pb, apis.ServeConfig{
 		HttpAddr:        "localhost:8080",
 		ShowStartBanner: true,
 	})
