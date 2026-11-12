@@ -1,53 +1,58 @@
 package app
 
 import (
-	"context"
 	"fmt"
-	"html/template"
 	"io/fs"
-	"log/slog"
+	"os"
+	"to-do/views"
 
 	"ganigeorgiev.com/pocketbase/pocketbase"
 	"ganigeorgiev.com/pocketbase/pocketbase/apis"
+	"ganigeorgiev.com/pocketbase/pocketbase/core"
+	"ganigeorgiev.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
 type App struct {
-	logger    *slog.Logger
-	Pb        *pocketbase.PocketBase
-	templates fs.FS
+	pb   *pocketbase.PocketBase
+	view *views.Views
 }
 
-func New(logger *slog.Logger, templates fs.FS) *App {
+func New(templates fs.FS) *App {
 	pb := pocketbase.NewWithConfig(pocketbase.Config{
 		HideStartBanner: false,
 		DefaultDataDir:  "./pb_data",
 	})
 
+	migratecmd.MustRegister(pb, pb.RootCmd, migratecmd.Config{
+		Automigrate:  true,
+		Dir:          "./migrations",
+		TemplateLang: migratecmd.TemplateLangGo,
+	})
+
 	return &App{
-		logger:    logger,
-		Pb:        pb,
-		templates: templates,
+		pb:   pb,
+		view: views.New(templates),
 	}
 }
 
-func (a *App) Start(ctx context.Context) error {
-	tmpl := template.Must(template.New("").ParseFS(a.templates, "templates/*"))
+func (a *App) Start() error {
+	a.pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		se.Router.GET("/", a.view.Home)
+		se.Router.GET("/todos", a.view.List)
+		se.Router.POST("/todos", a.view.Create)
+		se.Router.PATCH("/todos/{id}", a.view.Toggle)
+		se.Router.DELETE("/todos/{id}", a.view.Delete)
 
-	a.loadRoutes(tmpl)
-
-	if err := a.Pb.Bootstrap(); err != nil {
-		return fmt.Errorf("bootstrap pocketbase: %w", err)
-	}
-	defer a.Pb.ClearBootstrap()
-
-	a.logger.Info("server listening", slog.String("addr", "localhost:8080"))
-
-	err := apis.Serve(a.Pb, apis.ServeConfig{
-		HttpAddr:        "localhost:8080",
-		ShowStartBanner: true,
+		se.Router.GET("/static/{path...}", apis.Static(os.DirFS("./static"), false))
+		return se.Next()
 	})
-	if err != nil {
-		return fmt.Errorf("serve: %w", err)
+
+	if len(os.Args) == 1 {
+		a.pb.RootCmd.SetArgs([]string{"serve", "--http=localhost:8080"})
+	}
+
+	if err := a.pb.Start(); err != nil {
+		return fmt.Errorf("start pocketbase: %w", err)
 	}
 
 	return nil
