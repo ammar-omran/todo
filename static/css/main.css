@@ -2,10 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
-  color-scheme: dark;
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-slate-950 font-sans text-slate-100 antialiased;
+  }
+
+  ::selection {
+    @apply bg-indigo-500/30 text-white;
+  }
 }
 
-input {
-  --tw-ring-shadow: 0 0 #000 !important;
+.htmx-indicator {
+  display: none;
+}
+
+.htmx-request .htmx-indicator,
+.htmx-request.htmx-indicator {
+  display: flex;
 }
