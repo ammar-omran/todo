@@ -1,0 +1,35 @@
+{{define "todo-row" -}}
+<li id="todo-{{.Todo.Id}}" class="group flex items-start gap-3 px-4 py-3.5 transition hover:bg-app-panel/60 sm:px-5">
+  <button hx-patch="/todos/{{.Todo.Id}}"
+          hx-target="closest li"
+          hx-swap="outerHTML"
+          hx-include="#filter-form"
+          hx-status:4xx="target:#form-error"
+          hx-status:5xx="target:#form-error"
+          aria-label="{{if .Todo.Done}}{{ T "todo.mark_active" }}{{else}}{{ T "todo.mark_complete" }}{{end}}"
+          class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-accent focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg {{if .Todo.Done}}border-app-accent bg-app-accent text-white hover:bg-app-accent-strong{{else}}border-app-subtle text-transparent hover:border-app-accent hover:text-app-accent{{end}}">
+    <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+      <path d="M2.5 6.25 4.75 8.5 9.5 3.75" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+
+  <div class="min-w-0 flex-1">
+    <p class="break-words text-sm leading-6 {{if .Todo.Done}}text-app-subtle line-through decoration-app-border{{else}}text-app-text{{end}}">{{.Todo.Description}}</p>
+    <p class="mt-0.5 text-xs text-app-subtle">{{.CreatedLabel}}</p>
+  </div>
+
+  <button hx-delete="/todos/{{.Todo.Id}}"
+          hx-target="closest li"
+          hx-swap="delete"
+          hx-confirm="{{ T "todo.delete_confirm" .Todo.Description }}"
+          hx-status:4xx="target:#form-error"
+          hx-status:5xx="target:#form-error"
+          aria-label="{{ T "todo.delete_task" }}"
+          class="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-app-subtle opacity-100 transition hover:bg-app-danger/10 hover:text-app-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-app-danger focus-visible:ring-offset-2 focus-visible:ring-offset-app-bg sm:opacity-60 sm:group-hover:opacity-100 sm:focus-visible:opacity-100">
+    <svg class="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M6.25 2.75h3.5M3.5 4.25h9M5 4.25l.5 8.25h5l.5-8.25M6.75 6.5v3.75M9.25 6.5v3.75" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round" />
+    </svg>
+  </button>
+</li>
+{{- end}}
+{{- template "todo-row" . -}}

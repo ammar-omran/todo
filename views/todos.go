@@ -3,6 +3,9 @@ package views
 import (
 	"net/http"
 	"strings"
+	"time"
+
+	"to-do/internal/i18n"
 
 	"ganigeorgiev.com/pocketbase/dbx"
 	"ganigeorgiev.com/pocketbase/pocketbase/core"
@@ -11,13 +14,12 @@ import (
 	"ganigeorgiev.com/pocketbase/pocketbase/tools/search"
 )
 
-const (
-	todosCollectionName = "todos"
-	hxTriggerHeader     = "HX-Trigger"
-)
+const todosCollectionName = "todos"
 
 // List renders the todo list fragment.
 func (v *Views) List(e *core.RequestEvent) error {
+	tr := translatorFor(e)
+
 	collection, err := v.todosCollection(e)
 	if err != nil {
 		return v.renderError(e, router.ToApiError(err))
@@ -60,7 +62,7 @@ func (v *Views) List(e *core.RequestEvent) error {
 		return v.renderError(e, router.NewInternalServerError("Failed to load todos.", err))
 	}
 
-	html, err := v.todoListHTML(todoViews(records))
+	html, err := v.todoListHTML(todoRows(records, tr), tr)
 	if err != nil {
 		return v.renderError(e, router.NewInternalServerError("Failed to render todos.", err))
 	}
@@ -81,6 +83,7 @@ func (v *Views) Create(e *core.RequestEvent) error {
 	}
 
 	description, _ := requestInfo.Body["description"].(string)
+	filter := requestFilter(e, requestInfo)
 
 	record := core.NewRecord(collection)
 	form := forms.NewRecordUpsert(e.App, record)
@@ -98,9 +101,16 @@ func (v *Views) Create(e *core.RequestEvent) error {
 		return v.renderError(e, router.ToApiError(err))
 	}
 
-	e.Response.Header().Set(hxTriggerHeader, "todos-changed")
+	if filter == "completed" {
+		return e.NoContent(http.StatusNoContent)
+	}
 
-	return e.NoContent(http.StatusNoContent)
+	html, err := v.todoRowHTML(todoViewFromRecord(record), translatorFor(e))
+	if err != nil {
+		return v.renderError(e, router.NewInternalServerError("Failed to render todos.", err))
+	}
+
+	return e.HTML(http.StatusOK, html)
 }
 
 // Toggle flips the done state of a todo.
@@ -136,9 +146,20 @@ func (v *Views) Toggle(e *core.RequestEvent) error {
 		return v.renderError(e, router.ToApiError(err))
 	}
 
-	e.Response.Header().Set(hxTriggerHeader, "todos-changed")
+	done := record.GetBool("done")
+	filter := requestFilter(e, requestInfo)
 
-	return e.NoContent(http.StatusNoContent)
+	if (filter == "active" && done) || (filter == "completed" && !done) {
+		e.Response.Header().Set("HX-Reswap", "delete")
+		return e.HTML(http.StatusOK, "")
+	}
+
+	html, err := v.todoRowHTML(todoViewFromRecord(record), translatorFor(e))
+	if err != nil {
+		return v.renderError(e, router.NewInternalServerError("Failed to render todos.", err))
+	}
+
+	return e.HTML(http.StatusOK, html)
 }
 
 // Delete removes a todo.
@@ -172,9 +193,7 @@ func (v *Views) Delete(e *core.RequestEvent) error {
 		return v.renderError(e, router.ToApiError(err))
 	}
 
-	e.Response.Header().Set(hxTriggerHeader, "todos-changed")
-
-	return e.NoContent(http.StatusNoContent)
+	return e.HTML(http.StatusOK, "")
 }
 
 func (v *Views) todosCollection(e *core.RequestEvent) (*core.Collection, error) {
@@ -210,23 +229,41 @@ func canCreate(e *core.RequestEvent, collection *core.Collection, record *core.R
 	return allowed, err
 }
 
-func todoViews(records []*core.Record) []todoView {
-	todos := make([]todoView, 0, len(records))
+func requestFilter(e *core.RequestEvent, requestInfo *core.RequestInfo) string {
+	if filter, ok := requestInfo.Body["filter"].(string); ok {
+		return filter
+	}
+
+	return e.Request.URL.Query().Get("filter")
+}
+
+func todoViewFromRecord(record *core.Record) todoView {
+	return todoView{
+		Id:          record.Id,
+		Description: record.GetString("description"),
+		Created:     record.GetDateTime("created").Time().In(time.Local),
+		Done:        record.GetBool("done"),
+	}
+}
+
+func todoRows(records []*core.Record, tr i18n.Translator) []todoRowView {
+	rows := make([]todoRowView, 0, len(records))
 
 	for _, record := range records {
-		todos = append(todos, todoView{
-			Id:          record.Id,
-			Description: record.GetString("description"),
-			Created:     record.GetDateTime("created").Time(),
-			Done:        record.GetBool("done"),
+		todo := todoViewFromRecord(record)
+		rows = append(rows, todoRowView{
+			Todo:         todo,
+			CreatedLabel: tr.Date(todo.Created),
 		})
 	}
 
-	return todos
+	return rows
 }
 
 func (v *Views) renderError(e *core.RequestEvent, apiErr *router.ApiError) error {
-	html, err := v.errorMessageHTML(errorText(apiErr))
+	tr := translatorFor(e)
+
+	html, err := v.errorMessageHTML(errorText(apiErr, tr), tr)
 	if err != nil {
 		return err
 	}
@@ -237,7 +274,7 @@ func (v *Views) renderError(e *core.RequestEvent, apiErr *router.ApiError) error
 	return e.HTML(apiErr.Status, html)
 }
 
-func errorText(apiErr *router.ApiError) string {
+func errorText(apiErr *router.ApiError, tr i18n.Translator) string {
 	for _, value := range apiErr.Data {
 		field, ok := value.(map[string]any)
 		if !ok {
@@ -245,9 +282,9 @@ func errorText(apiErr *router.ApiError) string {
 		}
 
 		if message, ok := field["message"].(string); ok && message != "" {
-			return message
+			return localizeError(message, tr)
 		}
 	}
 
-	return apiErr.Message
+	return localizeError(apiErr.Message, tr)
 }

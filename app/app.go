@@ -38,6 +38,7 @@ func New(templates fs.FS) *App {
 func (a *App) Start() error {
 	a.pb.OnServe().BindFunc(func(se *core.ServeEvent) error {
 		se.Router.GET("/", a.view.Home)
+		se.Router.POST("/language", a.view.SetLanguage)
 		se.Router.GET("/todos", a.view.List)
 		se.Router.POST("/todos", a.view.Create)
 		se.Router.PATCH("/todos/{id}", a.view.Toggle)

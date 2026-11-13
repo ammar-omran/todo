@@ -3,17 +3,57 @@
 @tailwind utilities;
 
 @layer base {
-  html {
+  :root {
+    color-scheme: light;
+    --app-bg: 248 250 252;
+    --app-surface: 255 255 255;
+    --app-panel: 241 245 249;
+    --app-border: 226 232 240;
+    --app-text: 15 23 42;
+    --app-muted: 71 85 105;
+    --app-subtle: 100 116 139;
+    --app-accent: 79 70 229;
+    --app-accent-strong: 67 56 202;
+    --app-danger: 225 29 72;
+  }
+
+  .dark {
     color-scheme: dark;
+    --app-bg: 2 6 23;
+    --app-surface: 15 23 42;
+    --app-panel: 30 41 59;
+    --app-border: 30 41 59;
+    --app-text: 241 245 249;
+    --app-muted: 148 163 184;
+    --app-subtle: 100 116 139;
+    --app-accent: 99 102 241;
+    --app-accent-strong: 79 70 229;
+    --app-danger: 251 113 133;
+  }
+
+  html {
+    @apply bg-app-bg;
   }
 
   body {
-    @apply bg-slate-950 font-sans text-slate-100 antialiased;
+    @apply bg-app-bg font-sans text-app-text antialiased;
   }
 
   ::selection {
-    @apply bg-indigo-500/30 text-white;
+    @apply bg-app-accent/30 text-app-text;
   }
+
+  [x-cloak] {
+    display: none !important;
+  }
+}
+
+#todo-empty {
+  display: none;
+}
+
+#todo-panel[data-loaded="true"] #todo-list:empty + #todo-empty {
+  display: flex;
 }
 
 .htmx-indicator {

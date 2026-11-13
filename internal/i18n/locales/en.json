@@ -1,0 +1,68 @@
+{
+  "app": {
+    "title": "Todo",
+    "personal": "Personal",
+    "heading": "Todo",
+    "tagline": "Keep the list short and the next step clear."
+  },
+  "add": {
+    "heading": "Add a task",
+    "description_label": "Task description",
+    "placeholder": "What needs to be done?",
+    "button": "Add"
+  },
+  "list": {
+    "heading": "Tasks",
+    "filter_label": "Filter tasks",
+    "filter_all": "All",
+    "filter_active": "Active",
+    "filter_completed": "Completed",
+    "loading": "Loading tasks",
+    "empty_title": "No tasks to show",
+    "empty_description": "Add a task above or try a different filter."
+  },
+  "todo": {
+    "mark_active": "Mark as active",
+    "mark_complete": "Mark as complete",
+    "delete_confirm": "Delete \"%s\"?",
+    "delete_task": "Delete task"
+  },
+  "theme": {
+    "toggle": "Toggle theme"
+  },
+  "language": {
+    "arabic": "العربية",
+    "english": "English",
+    "switch_to_arabic": "Switch to Arabic",
+    "switch_to_english": "Switch to English"
+  },
+  "date": {
+    "month": {
+      "1": "Jan",
+      "2": "Feb",
+      "3": "Mar",
+      "4": "Apr",
+      "5": "May",
+      "6": "Jun",
+      "7": "Jul",
+      "8": "Aug",
+      "9": "Sep",
+      "10": "Oct",
+      "11": "Nov",
+      "12": "Dec"
+    }
+  },
+  "error": {
+    "cannot_be_blank": "Cannot be blank.",
+    "read_request": "Failed to read request.",
+    "load_todos": "Failed to load todos.",
+    "render_todos": "Failed to render todos.",
+    "build_list_rule": "Failed to build list rule.",
+    "apply_list_rule": "Failed to apply list rule.",
+    "render_home": "Failed to render home page.",
+    "missing_todos": "Missing todos collection.",
+    "forbidden": "You are not allowed to perform this request.",
+    "superuser_only": "Only superusers can perform this action.",
+    "generic": "Something went wrong. Try again."
+  }
+}
